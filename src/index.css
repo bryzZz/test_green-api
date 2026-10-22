@@ -1,0 +1,73 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans:
+    Roboto, -apple-system, BlinkMacSystemFont, system-ui, Avenir, Helvetica,
+    Arial, sans-serif;
+
+  /* MAX switches layout at 926px */
+  --breakpoint-md: 926px;
+
+  /* text */
+  --color-text: #060708;
+  --color-text-secondary: #060708ad;
+  --color-text-tertiary: #06070885;
+  --color-text-mute: #06070866;
+  --color-text-inverse: #fff;
+  --color-text-accent: #007aff;
+  --color-text-positive: #1abe43;
+  --color-text-negative: #ff303c;
+
+  /* surfaces */
+  --color-surface: #edeef2;
+  --color-bg: #fff;
+  --color-bg-secondary: #f5f7fa;
+  --color-bg-selected: #007aff14;
+  --color-input: #09090914;
+  --color-divider: #0c0d0e29;
+
+  /* accent */
+  --color-accent: #007aff;
+  --color-accent-disabled: #007aff7a;
+
+  /* bubbles */
+  --color-bubble-in: #fff;
+  --color-bubble-out: #e9fdff;
+  --color-bubble-out-text: #011c29;
+  --color-bubble-meta-in: #06070885;
+  --color-bubble-meta-out: #0784b8;
+  --color-status: #0f8ec2;
+  --color-capsule: #0f8ec285;
+
+  /* badges */
+  --color-badge: #007aff;
+  --color-badge-muted: #0607081f;
+
+  /* radii */
+  --radius-xs: 6px;
+  --radius-s: 10px;
+  --radius-m: 12px;
+  --radius-l: 16px;
+  --radius-xl: 20px;
+  --radius-card: 28px;
+
+  /* shadows */
+  --shadow-composer: 0 4px 16px #00000014, 0 0 2px #00000014;
+  --shadow-card: 0 4px 24px #00000014;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-bg font-sans text-text antialiased;
+  }
+}
+
+@utility bg-wallpaper {
+  background-image: linear-gradient(28deg, #99d5d7 8%, #80bcff 91.5%);
+}
