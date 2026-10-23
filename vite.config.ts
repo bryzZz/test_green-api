@@ -26,6 +26,9 @@ const mockServiceWorker = (): Plugin => {
 
 // https://vite.dev/config/
 export default defineConfig({
+  // GitHub Pages serves a project site under /<repository>/; the deploy
+  // workflow passes that path in.
+  base: process.env.BASE_PATH ?? '/',
   plugins: [react(), tailwindcss(), mockServiceWorker()],
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
