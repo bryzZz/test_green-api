@@ -197,6 +197,30 @@ describe('fake GREEN-API failures', () => {
   );
 });
 
+describe('fake GREEN-API failures during a held request', () => {
+  it.each([
+    ['network', 'network'],
+    ['server', 'server'],
+  ] as const)(
+    'breaks a request that waits for notifications as soon as a %s failure is switched on',
+    async (failure, kind) => {
+      const { fake, client } = setup({ ...fastTimings, maxHoldMs: 5_000 });
+      const waiting = client
+        .receiveNotification({ receiveTimeout: 20 })
+        .catch((e: unknown) => e);
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      const started = Date.now();
+      fake.setFailure(failure);
+      const error = await waiting;
+
+      expect(error).toBeInstanceOf(ApiError);
+      expect(error).toMatchObject({ kind });
+      expect(Date.now() - started).toBeLessThan(1_000);
+    },
+  );
+});
+
 describe('fake GREEN-API quota', () => {
   it('rejects the fourth new chat but keeps serving existing ones', async () => {
     const { client } = setup();

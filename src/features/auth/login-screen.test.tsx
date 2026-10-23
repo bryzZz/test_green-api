@@ -171,6 +171,29 @@ describe('LoginScreen errors', () => {
   );
 });
 
+describe('LoginScreen notice', () => {
+  it('shows why the user is asked to log in again', () => {
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <LoginScreen
+          onLoggedIn={() => {}}
+          notice="Учётные данные больше не действуют."
+        />
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Учётные данные больше не действуют.',
+    );
+  });
+
+  it('shows nothing extra when there is no reason', () => {
+    renderLogin();
+
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+});
+
 describe('LoginScreen form', () => {
   it('keeps the login button disabled until every field has a value', async () => {
     const { user } = renderLogin();

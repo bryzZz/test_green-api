@@ -49,9 +49,11 @@ function describeLoginError(error: unknown): string {
 
 type LoginScreenProps = {
   onLoggedIn: (credentials: Credentials) => void;
+  /** Why the user is asked to log in again, e.g. rejected credentials. */
+  notice?: string;
 };
 
-export function LoginScreen({ onLoggedIn }: LoginScreenProps) {
+export function LoginScreen({ onLoggedIn, notice }: LoginScreenProps) {
   const [apiUrl, setApiUrl] = useState(DEFAULT_API_URL);
   const [idInstance, setIdInstance] = useState('');
   const [apiTokenInstance, setApiTokenInstance] = useState('');
@@ -115,6 +117,15 @@ export function LoginScreen({ onLoggedIn }: LoginScreenProps) {
           </a>
           .
         </p>
+
+        {notice && (
+          <p
+            role="status"
+            className="bg-bg-secondary mb-4 rounded-md p-3 text-center text-[13px] leading-4"
+          >
+            {notice}
+          </p>
+        )}
 
         <fieldset disabled={login.isPending}>
           <Field

@@ -7,21 +7,37 @@ import { server } from '../../test/server';
 import { createChatsStore } from './chats-store';
 import { MainScreen } from './main-screen';
 
+// Plain http on purpose: see polling.test.ts (MSW's TLS emulation misbehaves
+// when the polling loop is aborted in flight as the screen is closed).
 const credentials = {
-  apiUrl: 'https://api.green-api.com',
+  apiUrl: 'http://api.green-api.com',
   idInstance: '1101000001',
   apiTokenInstance: 'secret-token',
 };
 
 function renderMain() {
   const onLogout = vi.fn();
-  render(
+  const onSessionExpired = vi.fn();
+  const view = render(
     <QueryClientProvider client={new QueryClient()}>
-      <MainScreen credentials={credentials} onLogout={onLogout} />
+      <MainScreen
+        credentials={credentials}
+        onLogout={onLogout}
+        onSessionExpired={onSessionExpired}
+      />
     </QueryClientProvider>,
   );
-  return { onLogout, user: userEvent.setup() };
+  return { onLogout, onSessionExpired, view, user: userEvent.setup() };
 }
+
+// A quick fake API: the echo bot answers within a few dozen milliseconds and
+// an empty queue is not held for long.
+const fastApi = {
+  deliveredDelayMs: 10,
+  readDelayMs: 30,
+  echoDelayMs: 60,
+  maxHoldMs: 100,
+};
 
 async function startChat(
   user: ReturnType<typeof userEvent.setup>,
@@ -33,7 +49,132 @@ async function startChat(
 }
 
 beforeEach(() => {
-  server.use(...createFakeGreenApi().handlers);
+  server.use(...createFakeGreenApi(fastApi).handlers);
+});
+
+const receiveUrl = '*/waInstance:id/receiveNotification/:token';
+
+describe('MainScreen receiving', () => {
+  it('shows the reply and the read marks that come back after sending', async () => {
+    const { user } = renderMain();
+    await startChat(user, '9991234567');
+    await user.type(
+      screen.getByRole('textbox', { name: 'Сообщение' }),
+      'Привет{Enter}',
+    );
+
+    // The echo bot answers with the same text, so it is shown twice.
+    await vi.waitFor(() =>
+      expect(screen.getAllByText('Привет').length).toBeGreaterThanOrEqual(3),
+    );
+    const mine = screen
+      .getAllByText('Привет')
+      .map((e) => e.closest('[data-direction]'))
+      .filter(
+        (e): e is HTMLElement =>
+          e?.getAttribute('data-direction') === 'outgoing',
+      );
+    expect(
+      await within(mine[0]).findByLabelText('Прочитано'),
+    ).toBeInTheDocument();
+    expect(
+      screen
+        .getAllByText('Привет')
+        .some(
+          (e) =>
+            e.closest('[data-direction]')?.getAttribute('data-direction') ===
+            'incoming',
+        ),
+    ).toBe(true);
+  });
+
+  it('opens a chat for a message from someone new', async () => {
+    const queue = [
+      {
+        receiptId: 1,
+        body: {
+          typeWebhook: 'incomingMessageReceived',
+          timestamp: Math.floor(Date.now() / 1000),
+          idMessage: 'IN1',
+          senderData: {
+            chatId: '10000009',
+            sender: '10000009',
+            chatName: 'Анна',
+          },
+          messageData: {
+            typeMessage: 'textMessage',
+            textMessageData: { textMessage: 'Здравствуйте!' },
+          },
+        },
+      },
+    ];
+    server.use(
+      http.get(receiveUrl, async () => {
+        if (queue.length === 0) await delay(50);
+        return HttpResponse.json(queue[0] ?? null);
+      }),
+      http.delete(
+        '*/waInstance:id/deleteNotification/:token/:receiptId',
+        () => {
+          queue.shift();
+          return HttpResponse.json({ result: true });
+        },
+      ),
+    );
+    renderMain();
+
+    const row = await screen.findByRole('button', { name: /Анна/ });
+
+    expect(within(row).getByText('Здравствуйте!')).toBeInTheDocument();
+  });
+
+  it('says it is waiting for the network while the connection is down, and stops saying it once it is back', async () => {
+    let broken = true;
+    server.use(
+      http.get(receiveUrl, () => (broken ? HttpResponse.error() : undefined)),
+    );
+    renderMain();
+
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Ожидание сети',
+    );
+
+    broken = false;
+    window.dispatchEvent(new Event('online'));
+
+    await vi.waitFor(() =>
+      expect(screen.queryByRole('status')).not.toBeInTheDocument(),
+    );
+  });
+
+  it('says the session is over when the credentials are rejected', async () => {
+    server.use(
+      http.get(receiveUrl, () => HttpResponse.json({}, { status: 401 })),
+    );
+
+    const { onSessionExpired } = renderMain();
+
+    await vi.waitFor(() => expect(onSessionExpired).toHaveBeenCalledTimes(1));
+  });
+
+  it('stops asking GREEN-API for messages when the screen is closed', async () => {
+    let requests = 0;
+    server.use(
+      http.get(receiveUrl, async () => {
+        requests += 1;
+        await delay(20);
+        return HttpResponse.json(null);
+      }),
+    );
+    const { view } = renderMain();
+    await vi.waitFor(() => expect(requests).toBeGreaterThan(1));
+
+    view.unmount();
+    const after = requests;
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    expect(requests).toBeLessThanOrEqual(after + 1);
+  });
 });
 
 describe('MainScreen', () => {

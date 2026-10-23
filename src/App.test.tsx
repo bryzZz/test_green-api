@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { http, HttpResponse } from 'msw';
 import App from './App';
 import { authStore } from './features/auth/auth';
 import { createFakeGreenApi } from './mocks/fake-green-api';
@@ -45,6 +46,49 @@ describe('App', () => {
     render(<App />);
 
     expect(screen.getByRole('button', { name: 'Выйти' })).toBeInTheDocument();
+  });
+
+  it('returns to the login screen with an explanation when GREEN-API rejects the credentials', async () => {
+    server.use(
+      http.get('*/waInstance:id/receiveNotification/:token', () =>
+        HttpResponse.json({}, { status: 401 }),
+      ),
+    );
+    authStore.getState().login(credentials);
+
+    render(<App />);
+
+    expect(
+      await screen.findByRole('heading', { name: 'Вход в GREEN-API' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Учётные данные больше не действуют',
+    );
+    expect(localStorage.getItem('max-chat:credentials')).not.toContain(
+      'secret-token',
+    );
+  });
+
+  it('does not repeat the explanation when the user logs out on their own later', async () => {
+    server.use(
+      http.get('*/waInstance:id/receiveNotification/:token', () =>
+        HttpResponse.json({}, { status: 401 }),
+      ),
+    );
+    authStore.getState().login(credentials);
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole('status');
+    server.resetHandlers();
+    server.use(...createFakeGreenApi({ maxHoldMs: 100 }).handlers);
+
+    await user.type(screen.getByLabelText('idInstance'), '1101000001');
+    await user.type(screen.getByLabelText('apiTokenInstance'), 'secret-token');
+    await user.click(screen.getByRole('button', { name: 'Войти' }));
+    await screen.findByRole('button', { name: 'Выйти' });
+    await user.click(screen.getByRole('button', { name: 'Выйти' }));
+
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
   it('returns to the login screen and forgets the credentials on logout', async () => {

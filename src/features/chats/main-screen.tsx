@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useStore } from 'zustand';
 import type { Credentials } from '../../api/client';
 import { formatPhone } from '../../shared/lib/phone';
+import { useMessageReceiver } from '../messages/use-message-receiver';
 import { ChatList } from './chat-list';
 import { ChatWindow } from './chat-window';
 import { createChatsStore, selectSortedChats } from './chats-store';
@@ -11,12 +12,23 @@ import { NewChatDialog } from './new-chat-dialog';
 type MainScreenProps = {
   credentials: Credentials;
   onLogout: () => void;
+  /** GREEN-API rejected the credentials while receiving messages. */
+  onSessionExpired: () => void;
 };
 
-export function MainScreen({ credentials, onLogout }: MainScreenProps) {
+export function MainScreen({
+  credentials,
+  onLogout,
+  onSessionExpired,
+}: MainScreenProps) {
   const [store] = useState(() => createChatsStore(credentials.idInstance));
   const chats = useStore(store, selectSortedChats);
   const chatIdByPhone = useStore(store, (state) => state.chatIdByPhone);
+  const connected = useMessageReceiver({
+    credentials,
+    store,
+    onUnauthorized: onSessionExpired,
+  });
 
   const [activeChatId, setActiveChatId] = useState<string>();
   const [newChatOpen, setNewChatOpen] = useState(false);
@@ -29,7 +41,24 @@ export function MainScreen({ credentials, onLogout }: MainScreenProps) {
         className={`${activeChat ? 'hidden' : 'flex'} w-full flex-col md:flex md:w-98.5 md:shrink-0`}
       >
         <header className="flex items-center justify-between px-4 pt-5 pb-3">
-          <h1 className="text-2xl leading-7 font-semibold">Чаты</h1>
+          {/* Like MAX: without a connection the title fades and says why. */}
+          <div className="flex h-11 flex-col justify-center">
+            <h1
+              className={`text-2xl leading-7 font-semibold ${
+                connected ? '' : 'text-text-secondary'
+              }`}
+            >
+              Чаты
+            </h1>
+            {!connected && (
+              <p
+                role="status"
+                className="text-text-tertiary text-[11px] leading-4"
+              >
+                Ожидание сети…
+              </p>
+            )}
+          </div>
           <div className="flex items-center gap-2">
             <button
               type="button"

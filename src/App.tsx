@@ -7,6 +7,8 @@ import { MainScreen } from './features/chats/main-screen';
 export default function App() {
   const [queryClient] = useState(() => new QueryClient());
   const credentials = useCredentials();
+  // Why the login screen is shown again, if it was not the user's choice.
+  const [notice, setNotice] = useState<string>();
 
   function logout() {
     // Forget the token first, so nothing mounted can refetch with it, then
@@ -21,10 +23,20 @@ export default function App() {
         <MainScreen
           key={credentials.idInstance}
           credentials={credentials}
-          onLogout={logout}
+          onLogout={() => {
+            setNotice(undefined);
+            logout();
+          }}
+          onSessionExpired={() => {
+            // A loop that outlived its session must not end the new one.
+            if (authStore.getState().credentials !== credentials) return;
+            setNotice('Учётные данные больше не действуют. Войдите заново.');
+            logout();
+          }}
         />
       ) : (
         <LoginScreen
+          notice={notice}
           onLoggedIn={(loggedIn) => authStore.getState().login(loggedIn)}
         />
       )}

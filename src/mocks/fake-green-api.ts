@@ -120,19 +120,19 @@ export function createFakeGreenApi({
 
   let failure: FakeFailure = null;
 
+  const failureResponse = () => {
+    if (failure === 'network') return HttpResponse.error();
+    if (failure === 'server') {
+      return HttpResponse.json({ error: 'fake server error' }, { status: 500 });
+    }
+    return undefined;
+  };
+
   // Every endpoint goes through this guard, so one switch breaks them all.
   const guard =
     (resolver: HttpResponseResolver): HttpResponseResolver =>
-    (info) => {
-      if (failure === 'network') return HttpResponse.error();
-      if (failure === 'server') {
-        return HttpResponse.json(
-          { error: 'fake server error' },
-          { status: 500 },
-        );
-      }
-      return resolver(info);
-    };
+    (info) =>
+      failureResponse() ?? resolver(info);
   const get = (path: string, resolver: HttpResponseResolver) =>
     http.get(path, guard(resolver));
   const post = (path: string, resolver: HttpResponseResolver) =>
@@ -214,7 +214,9 @@ export function createFakeGreenApi({
           request.signal,
         );
       }
-      return HttpResponse.json(queue[0] ?? null);
+      // A failure switched on while this request was held breaks it too, as a
+      // dropped connection would.
+      return failureResponse() ?? HttpResponse.json(queue[0] ?? null);
     }),
 
     del(`${route('deleteNotification')}/:receiptId`, ({ params }) => {
@@ -230,6 +232,7 @@ export function createFakeGreenApi({
     handlers,
     setFailure(next: FakeFailure) {
       failure = next;
+      if (next) for (const wake of waiters) wake();
     },
     /** Cancels the pending recipient simulation (delivered, read, echo). */
     dispose() {
