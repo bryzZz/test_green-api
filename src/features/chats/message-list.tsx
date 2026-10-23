@@ -1,4 +1,10 @@
-import { useEffect, useLayoutEffect, useRef } from 'react';
+import {
+  Fragment,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  type RefObject,
+} from 'react';
 import type { ApiErrorKind } from '../../api/errors';
 import { dayKey, formatChatTime, formatDayLabel } from '../../shared/lib/time';
 import type { Message } from './chats-store';
@@ -35,13 +41,35 @@ function groupByDay(messages: Message[]) {
 
 type MessageListProps = {
   messages: Message[];
+  /** The first message the user has not seen: the bar goes above it. */
+  unreadFromId?: string;
 };
 
-export function MessageList({ messages }: MessageListProps) {
+export function MessageList({ messages, unreadFromId }: MessageListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const unreadBarRef = useRef<HTMLDivElement>(null);
   const pinnedRef = useRef(true);
-  const knownCountRef = useRef(0);
+  const knownCountRef = useRef(messages.length);
   const hasMessages = messages.length > 0;
+
+  // On opening, bring the unread bar to the top (the end of the list stops it
+  // when there is little below), as MAX does; without one, start at the end.
+  // Its own effect, and idempotent: StrictMode runs it twice.
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const bar = unreadBarRef.current;
+    if (bar) {
+      el.scrollTop =
+        bar.getBoundingClientRect().top -
+        el.getBoundingClientRect().top +
+        el.scrollTop;
+      pinnedRef.current =
+        el.scrollHeight - el.scrollTop - el.clientHeight < STICK_TO_BOTTOM_PX;
+    } else {
+      el.scrollTop = el.scrollHeight;
+    }
+  }, []);
 
   // Stay at the bottom while the reader is there: a message arrives, a status
   // adds a line under a bubble, the list grows. Someone reading older messages
@@ -89,9 +117,13 @@ export function MessageList({ messages }: MessageListProps) {
           Сообщений пока нет. Напишите первым.
         </p>
       ) : (
-        <ol className="mx-auto flex max-w-183 flex-col px-4 pb-2">
+        <ol className="flex flex-col pb-2">
           {groupByDay(messages).map((day) => (
             <li key={day.key} className="flex flex-col">
+              {/* Above the day label when the unread messages begin the day. */}
+              {day.messages[0].id === unreadFromId && (
+                <UnreadBar barRef={unreadBarRef} />
+              )}
               {/* Sticks to the top while its day is being read, like in MAX. */}
               <span
                 data-testid="day-label"
@@ -100,16 +132,33 @@ export function MessageList({ messages }: MessageListProps) {
                 {formatDayLabel(day.messages[0].timestamp)}
               </span>
               {day.messages.map((message, index) => (
-                <Bubble
-                  key={message.id}
-                  message={message}
-                  position={positionInGroup(day.messages, index)}
-                />
+                <Fragment key={message.id}>
+                  {index > 0 && message.id === unreadFromId && (
+                    <UnreadBar barRef={unreadBarRef} />
+                  )}
+                  <Bubble
+                    message={message}
+                    position={positionInGroup(day.messages, index)}
+                  />
+                </Fragment>
               ))}
             </li>
           ))}
         </ol>
       )}
+    </div>
+  );
+}
+
+/** The bar MAX puts above the first message the user has not seen yet. */
+function UnreadBar({ barRef }: { barRef: RefObject<HTMLDivElement | null> }) {
+  return (
+    <div
+      ref={barRef}
+      data-testid="unread-bar"
+      className="text-text my-3 w-full bg-white/88 px-4 py-1 text-center text-sm leading-[18px] tracking-[0.15px]"
+    >
+      Новые сообщения
     </div>
   );
 }
@@ -159,9 +208,9 @@ function Bubble({
     <div
       data-direction={message.direction}
       data-position={position}
-      className={`flex flex-col ${startsGroup ? 'mt-2' : 'mt-0.5'} ${
-        outgoing ? 'items-end' : 'items-start'
-      }`}
+      className={`mx-auto flex w-full max-w-183 flex-col px-4 ${
+        startsGroup ? 'mt-2' : 'mt-0.5'
+      } ${outgoing ? 'items-end' : 'items-start'}`}
     >
       <div
         className={`max-w-[85%] rounded-lg px-2.5 pt-2 pb-2.5 text-base leading-5 wrap-break-word md:max-w-[70%] ${corners} ${

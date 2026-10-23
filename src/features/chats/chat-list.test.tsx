@@ -72,7 +72,7 @@ describe('ChatList', () => {
     expect(screen.getByText('Сообщение не поддерживается')).toBeInTheDocument();
   });
 
-  it('shows a chat that has no messages yet without a preview or time', () => {
+  it('shows a chat that has no messages yet without a time', () => {
     renderList([chat({ messages: [] })]);
 
     const row = screen.getByRole('button', { name: /Иван Петров/ });
@@ -123,6 +123,50 @@ describe('ChatList', () => {
     await user.click(screen.getByRole('button', { name: /Иван/ }));
 
     expect(onSelect).toHaveBeenCalledWith('10000001');
+  });
+
+  it('shows how many messages are unread', () => {
+    renderList([
+      chat({
+        messages: [
+          message({ id: 'a', timestamp: todayAt1910 }),
+          message({ id: 'b', timestamp: todayAt1910 + 60 }),
+          message({ id: 'c', timestamp: todayAt1910 + 120 }),
+        ],
+      }),
+    ]);
+
+    const row = screen.getByRole('button', { name: /Иван Петров/ });
+    expect(
+      within(row).getByRole('img', { name: 'Непрочитанных: 3' }),
+    ).toHaveTextContent('3');
+  });
+
+  it('shows no count when everything has been read', () => {
+    renderList([chat({ lastReadId: 'm1' })]);
+
+    expect(
+      screen.queryByRole('img', { name: /Непрочитанных/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('does not count what the user wrote as unread', () => {
+    renderList([
+      chat({
+        messages: [message({ direction: 'outgoing', status: 'sent' })],
+      }),
+    ]);
+
+    expect(
+      screen.queryByRole('img', { name: /Непрочитанных/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('says there are no messages instead of leaving a hole under the name', () => {
+    renderList([chat({ messages: [] })]);
+
+    const row = screen.getByRole('button', { name: /Иван Петров/ });
+    expect(within(row).getByText('Нет сообщений')).toBeInTheDocument();
   });
 
   it('explains how to start when there are no chats', () => {

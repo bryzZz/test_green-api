@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { delay, http, HttpResponse } from 'msw';
+import type { ReactNode } from 'react';
 import { createFakeGreenApi } from '../../mocks/fake-green-api';
 import { server } from '../../test/server';
 import { NewChatDialog } from './new-chat-dialog';
@@ -14,11 +15,14 @@ const credentials = {
 
 function renderDialog(
   knownChatId: (phone: string) => string | undefined = () => undefined,
+  /** Something on the page behind the dialog. */
+  pageBehind?: ReactNode,
 ) {
   const onResolved = vi.fn();
   const onClose = vi.fn();
   render(
     <QueryClientProvider client={new QueryClient()}>
+      {pageBehind}
       <NewChatDialog
         credentials={credentials}
         knownChatId={knownChatId}
@@ -164,6 +168,75 @@ describe('NewChatDialog lookup', () => {
     await user.type(phoneField(), '{Backspace}');
 
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+});
+
+describe('NewChatDialog focus', () => {
+  it('starts in the phone field', () => {
+    renderDialog();
+
+    expect(phoneField()).toHaveFocus();
+  });
+
+  it('keeps Tab inside the dialog, going round from the last control to the first', async () => {
+    const { user } = renderDialog();
+    const close = screen.getByRole('button', { name: 'Закрыть' });
+    await user.type(phoneField(), '9991234567');
+
+    // field → submit → (wraps) close → field
+    await user.tab();
+    expect(submit()).toHaveFocus();
+    await user.tab();
+    expect(close).toHaveFocus();
+    await user.tab();
+    expect(phoneField()).toHaveFocus();
+  });
+
+  it('keeps Shift+Tab inside too, going round from the first control to the last', async () => {
+    const { user } = renderDialog();
+    const close = screen.getByRole('button', { name: 'Закрыть' });
+    await user.type(phoneField(), '9991234567');
+    await user.tab({ shift: true }); // field → close
+    expect(close).toHaveFocus();
+
+    await user.tab({ shift: true });
+
+    expect(submit()).toHaveFocus();
+  });
+
+  it('keeps Tab inside even after the focused button was disabled by the lookup', async () => {
+    server.use(
+      http.post('*/waInstance:id/checkAccount/:token', async () => {
+        await delay(200);
+        return HttpResponse.json({ exist: true, chatId: '10000001' });
+      }),
+    );
+    const { user } = renderDialog(undefined, <button>Page behind</button>);
+    await user.type(phoneField(), '9991234567');
+    await user.tab();
+    await user.keyboard('{Enter}'); // submit has the focus and turns disabled
+    expect(screen.getByRole('button', { name: 'Ищем…' })).toBeDisabled();
+    // A browser drops the focus of a control that gets disabled; jsdom doesn't.
+    (document.activeElement as HTMLElement).blur();
+
+    await user.tab();
+
+    expect(screen.getByRole('dialog')).toContainElement(
+      document.activeElement as HTMLElement,
+    );
+    expect(
+      screen.getByRole('button', { name: 'Page behind' }),
+    ).not.toHaveFocus();
+  });
+
+  it('skips the submit button while it is disabled', async () => {
+    const { user } = renderDialog();
+
+    await user.tab();
+    expect(screen.getByRole('button', { name: 'Закрыть' })).toHaveFocus();
+    await user.tab();
+
+    expect(phoneField()).toHaveFocus();
   });
 });
 

@@ -1,5 +1,10 @@
 import type { NotificationEvent } from '../../api/notifications';
-import { createChatsStore, selectSortedChats } from './chats-store';
+import {
+  createChatsStore,
+  firstUnreadId,
+  selectSortedChats,
+  unreadCount,
+} from './chats-store';
 
 function incoming(
   overrides: Partial<Extract<NotificationEvent, { type: 'message' }>> = {},
@@ -33,6 +38,125 @@ describe('chats store: sending', () => {
     expect(
       store.getState().chats['10000000'].messages[0].idMessage,
     ).toBeUndefined();
+  });
+});
+
+describe('chats store: unread messages', () => {
+  const chatOf = (store: ReturnType<typeof createChatsStore>) =>
+    store.getState().chats['10000000'];
+
+  it('counts incoming messages as unread until the chat is read', () => {
+    const store = createChatsStore('1101000001');
+
+    store.getState().applyEvent(incoming({ idMessage: 'A1', timestamp: 100 }));
+    store.getState().applyEvent(incoming({ idMessage: 'A2', timestamp: 200 }));
+
+    expect(unreadCount(chatOf(store))).toBe(2);
+    expect(firstUnreadId(chatOf(store))).toBe('A1');
+  });
+
+  it('has nothing unread once the chat is marked read, and counts only what comes after', () => {
+    const store = createChatsStore('1101000001');
+    store.getState().applyEvent(incoming({ idMessage: 'A1', timestamp: 100 }));
+
+    store.getState().markRead('10000000');
+    expect(unreadCount(chatOf(store))).toBe(0);
+    expect(firstUnreadId(chatOf(store))).toBeUndefined();
+
+    store.getState().applyEvent(incoming({ idMessage: 'A2', timestamp: 200 }));
+    expect(unreadCount(chatOf(store))).toBe(1);
+    expect(firstUnreadId(chatOf(store))).toBe('A2');
+  });
+
+  it('does not count messages written by the user', () => {
+    const store = createChatsStore('1101000001');
+    store.getState().applyEvent(incoming({ idMessage: 'A1', timestamp: 100 }));
+    store
+      .getState()
+      .applyEvent(
+        incoming({ direction: 'outgoing', idMessage: 'O1', timestamp: 200 }),
+      );
+    store.getState().applyEvent(incoming({ idMessage: 'A2', timestamp: 300 }));
+    store.getState().markRead('10000000');
+
+    store
+      .getState()
+      .applyEvent(
+        incoming({ direction: 'outgoing', idMessage: 'O2', timestamp: 400 }),
+      );
+
+    expect(unreadCount(chatOf(store))).toBe(0);
+  });
+
+  it('counts a message written on the phone as read, as it was written by the user', () => {
+    const store = createChatsStore('1101000001');
+    store.getState().applyEvent(incoming({ idMessage: 'A1', timestamp: 100 }));
+    store.getState().markRead('10000000');
+
+    store
+      .getState()
+      .applyEvent(
+        incoming({ direction: 'outgoing', idMessage: 'O1', timestamp: 200 }),
+      );
+    store.getState().applyEvent(incoming({ idMessage: 'A2', timestamp: 300 }));
+
+    expect(firstUnreadId(chatOf(store))).toBe('A2');
+  });
+
+  it('treats everything as read after the user sends a message', () => {
+    const store = createChatsStore('1101000001');
+    store.getState().applyEvent(incoming({ idMessage: 'A1', timestamp: 100 }));
+    store.getState().applyEvent(incoming({ idMessage: 'A2', timestamp: 200 }));
+
+    store.getState().startSending('10000000', 'Reply');
+
+    expect(unreadCount(chatOf(store))).toBe(0);
+  });
+
+  it('keeps the read marker when the message it pointed at is merged into the local one', () => {
+    const store = createChatsStore('1101000001');
+    const localId = store.getState().startSending('10000000', 'Hello');
+    // An echo that does not match the pending text stays a separate message.
+    store.getState().applyEvent(
+      incoming({
+        direction: 'outgoing',
+        idMessage: 'API1',
+        content: { kind: 'text', text: 'Hello (edited)' },
+        timestamp: Math.floor(Date.now() / 1000),
+      }),
+    );
+    store.getState().markRead('10000000'); // the marker is now the echo
+
+    store.getState().confirmSent('10000000', localId, 'API1'); // echo is removed
+    store.getState().applyEvent(
+      incoming({
+        idMessage: 'A2',
+        timestamp: Math.floor(Date.now() / 1000) + 10,
+      }),
+    );
+
+    expect(unreadCount(chatOf(store))).toBe(1);
+  });
+
+  it('has nothing unread in a chat without messages', () => {
+    const store = createChatsStore('1101000001');
+    store.getState().openChat({ chatId: '10000000' });
+
+    expect(unreadCount(chatOf(store))).toBe(0);
+    expect(firstUnreadId(chatOf(store))).toBeUndefined();
+  });
+
+  it('remembers what was read across a reload', () => {
+    const first = createChatsStore('1101000001');
+    first.getState().applyEvent(incoming({ idMessage: 'A1', timestamp: 100 }));
+    first.getState().applyEvent(incoming({ idMessage: 'A2', timestamp: 200 }));
+    first.getState().markRead('10000000');
+    first.getState().applyEvent(incoming({ idMessage: 'A3', timestamp: 300 }));
+
+    const reloaded = createChatsStore('1101000001');
+
+    expect(unreadCount(chatOf(reloaded))).toBe(1);
+    expect(firstUnreadId(chatOf(reloaded))).toBe('A3');
   });
 });
 

@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
+import { StrictMode } from 'react';
 import { MessageList } from './message-list';
 import type { Message } from './chats-store';
 
@@ -138,6 +139,111 @@ describe('MessageList scrolling', () => {
     );
 
     expect(scroller(container).scrollTop).toBe(1200);
+  });
+});
+
+describe('MessageList opening on the unread bar', () => {
+  beforeEach(() => {
+    layout.content = 2000;
+    fakeScrolling();
+    // The bar is 300px below the top of the content; like in a browser, it
+    // moves up as the scroller is scrolled. Everything else is at 0.
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
+      function (this: HTMLElement) {
+        const scroller = this.closest('[class*="overflow-y"]');
+        const scrolled = scroller ? (scrollTops.get(scroller) ?? 0) : 0;
+        const top = this.dataset.testid === 'unread-bar' ? 300 - scrolled : 0;
+        return {
+          top,
+          bottom: top,
+          left: 0,
+          right: 0,
+          width: 0,
+          height: 0,
+          x: 0,
+          y: top,
+          toJSON: () => ({}),
+        };
+      },
+    );
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    restoreScrolling();
+  });
+
+  const messages = [
+    message({ id: '1', timestamp: todayAt1910 }),
+    message({ id: '2', timestamp: todayAt1910 + 60 }),
+  ];
+
+  it('brings the bar to the top of the list instead of going to the bottom', () => {
+    const { container } = render(
+      <MessageList messages={messages} unreadFromId="2" />,
+    );
+
+    expect((container.firstElementChild as HTMLElement).scrollTop).toBe(300);
+  });
+
+  it('does the same under StrictMode, which runs the effects twice', () => {
+    const { container } = render(
+      <StrictMode>
+        <MessageList messages={messages} unreadFromId="2" />
+      </StrictMode>,
+    );
+
+    expect((container.firstElementChild as HTMLElement).scrollTop).toBe(300);
+  });
+});
+
+describe('MessageList unread marker', () => {
+  const text = (value: string) => ({ kind: 'text' as const, text: value });
+  const before = (a: HTMLElement, b: HTMLElement) =>
+    Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+
+  it('puts a «Новые сообщения» bar before the first unread message', () => {
+    render(
+      <MessageList
+        unreadFromId="2"
+        messages={[
+          message({ id: '1', content: text('seen') }),
+          message({ id: '2', content: text('new one') }),
+          message({ id: '3', content: text('new two') }),
+        ]}
+      />,
+    );
+
+    const bar = screen.getByText('Новые сообщения');
+    expect(before(bubbleOf('seen'), bar)).toBe(true);
+    expect(before(bar, bubbleOf('new one'))).toBe(true);
+    expect(screen.getAllByText('Новые сообщения')).toHaveLength(1);
+  });
+
+  it('puts the bar above the day label when the unread messages begin a new day', () => {
+    render(
+      <MessageList
+        unreadFromId="2"
+        messages={[
+          message({
+            id: '1',
+            content: text('old'),
+            timestamp: todayAt1910 - DAY,
+          }),
+          message({ id: '2', content: text('fresh'), timestamp: todayAt1910 }),
+        ]}
+      />,
+    );
+
+    const bar = screen.getByText('Новые сообщения');
+    const label = screen.getAllByTestId('day-label')[1];
+    expect(before(bar, label)).toBe(true);
+    expect(before(label, bubbleOf('fresh'))).toBe(true);
+  });
+
+  it('shows no bar when nothing is unread', () => {
+    render(<MessageList messages={[message()]} />);
+
+    expect(screen.queryByText('Новые сообщения')).not.toBeInTheDocument();
   });
 });
 

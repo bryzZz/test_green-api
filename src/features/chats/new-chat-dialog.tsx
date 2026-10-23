@@ -1,10 +1,11 @@
 import { useMutation } from '@tanstack/react-query';
 import { X } from 'lucide-react';
-import { useEffect, useState, type ComponentProps } from 'react';
+import { useEffect, useRef, useState, type ComponentProps } from 'react';
 import { IMaskInput } from 'react-imask';
 import { createGreenApiClient, type Credentials } from '../../api/client';
 import { ApiError } from '../../api/errors';
 import { normalizePhone } from '../../shared/lib/phone';
+import { ghostButtonClass } from '../../shared/ui/ghost-button';
 import { primaryButtonClass, Spinner } from '../../shared/ui/primary-button';
 
 const COMPLETE_MASK = /^\+7 \(\d{3}\) \d{3}-\d{2}-\d{2}$/;
@@ -59,13 +60,47 @@ export function NewChatDialog({
     },
   });
 
+  const dialogRef = useRef<HTMLFormElement>(null);
+  // The listener below is set up once and must still call the latest onClose.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
+
+  // Escape closes. The dialog is modal, so Tab goes round inside it instead of
+  // reaching the page behind the overlay. Listening on the document (not the
+  // form) also catches Tab when the focused control has just been disabled by
+  // the lookup, which leaves the focus on the body.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key === 'Escape') {
+        onCloseRef.current();
+        return;
+      }
+      const dialog = dialogRef.current;
+      if (event.key !== 'Tab' || !dialog) return;
+
+      const controls = [
+        ...dialog.querySelectorAll<HTMLElement>(
+          'button:not(:disabled), input:not(:disabled)',
+        ),
+      ];
+      const first = controls[0];
+      const last = controls.at(-1);
+      const active = document.activeElement as HTMLElement | null;
+      // Not on one of the controls: outside the dialog, or on a control that
+      // was disabled meanwhile.
+      const lost = !active || !controls.includes(active);
+      const atEdge = event.shiftKey ? active === first : active === last;
+
+      if (lost || atEdge) {
+        event.preventDefault();
+        (event.shiftKey ? last : first)?.focus();
+      }
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [onClose]);
+  }, []);
 
   const handleSubmit: ComponentProps<'form'>['onSubmit'] = (event) => {
     event.preventDefault();
@@ -82,6 +117,7 @@ export function NewChatDialog({
       }}
     >
       <form
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="new-chat-title"
@@ -92,7 +128,7 @@ export function NewChatDialog({
           type="button"
           aria-label="Закрыть"
           onClick={onClose}
-          className="text-text-tertiary hover:text-text absolute top-4 right-4 cursor-pointer rounded-full p-1"
+          className={`${ghostButtonClass} absolute top-4 right-4 size-8`}
         >
           <X className="size-5" />
         </button>

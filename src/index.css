@@ -23,6 +23,9 @@
   --color-bg: #fff;
   --color-bg-secondary: #f5f7fa;
   --color-bg-selected: #007aff14;
+  --color-icon: #060708d6;
+  --color-ghost-hover: #0d0d0d0a;
+  --color-ghost-pressed: #0d0d0d14;
   --color-row-hover: #f6f6f6;
   --color-row-pressed: #fafafa;
   --color-input: #09090914;

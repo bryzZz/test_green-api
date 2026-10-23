@@ -1,6 +1,6 @@
 import { formatChatTime } from '../../shared/lib/time';
 import { ChatAvatar } from './chat-avatar';
-import type { Chat, Message } from './chats-store';
+import { unreadCount, type Chat, type Message } from './chats-store';
 import { DeliveryMark } from './delivery-mark';
 
 type ChatListProps = {
@@ -30,6 +30,7 @@ export function ChatList({ chats, activeChatId, onSelect }: ChatListProps) {
       {chats.map((chat) => {
         const last = chat.messages.at(-1);
         const active = chat.chatId === activeChatId;
+        const unread = unreadCount(chat);
 
         return (
           <li key={chat.chatId}>
@@ -66,11 +67,20 @@ export function ChatList({ chats, activeChatId, onSelect }: ChatListProps) {
                     </span>
                   )}
                 </span>
-                {last && (
-                  <span className="text-text-tertiary line-clamp-2 pt-0.5 text-[15px] leading-5 tracking-[0.15px]">
-                    {previewText(last)}
+                <span className="flex items-start gap-2">
+                  <span className="text-text-tertiary line-clamp-2 min-w-0 flex-1 pt-0.5 text-[15px] leading-5 tracking-[0.15px]">
+                    {last ? previewText(last) : 'Нет сообщений'}
                   </span>
-                )}
+                  {unread > 0 && (
+                    <span
+                      role="img"
+                      aria-label={`Непрочитанных: ${unread}`}
+                      className="bg-badge mt-0.5 flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1.5 text-xs leading-4 font-semibold tracking-[0.3px] text-white"
+                    >
+                      {unread}
+                    </span>
+                  )}
+                </span>
               </span>
             </button>
           </li>

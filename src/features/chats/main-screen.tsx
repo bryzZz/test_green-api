@@ -1,8 +1,9 @@
 import { LogOut, Plus } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useStore } from 'zustand';
 import type { Credentials } from '../../api/client';
 import { formatPhone } from '../../shared/lib/phone';
+import { ghostButtonClass } from '../../shared/ui/ghost-button';
 import { useMessageReceiver } from '../messages/use-message-receiver';
 import { ChatList } from './chat-list';
 import { ChatWindow } from './chat-window';
@@ -32,7 +33,34 @@ export function MainScreen({
 
   const [activeChatId, setActiveChatId] = useState<string>();
   const [newChatOpen, setNewChatOpen] = useState(false);
+  const newChatButtonRef = useRef<HTMLButtonElement>(null);
   const activeChat = chats.find((chat) => chat.chatId === activeChatId);
+
+  // An open chat is one step in the browser history, so on a phone the system
+  // Back button returns to the list instead of leaving the site. Going from
+  // one chat to another (side by side from md) stays one step.
+  useEffect(() => {
+    // A reload keeps the state of the entry it happened on: start from the list.
+    window.history.replaceState(null, '');
+    const onPopState = (event: PopStateEvent) =>
+      setActiveChatId(event.state?.chatId);
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
+
+  function showChat(chatId: string) {
+    if (activeChatId === undefined) {
+      window.history.pushState({ chatId }, '');
+    } else {
+      window.history.replaceState({ chatId }, '');
+    }
+    setActiveChatId(chatId);
+  }
+
+  function closeChat() {
+    if (window.history.state?.chatId) window.history.back();
+    else setActiveChatId(undefined);
+  }
 
   return (
     <div className="bg-bg flex h-full">
@@ -64,11 +92,12 @@ export function MainScreen({
               type="button"
               aria-label="Выйти"
               onClick={onLogout}
-              className="text-text-tertiary hover:text-text flex size-8 cursor-pointer items-center justify-center rounded-full"
+              className={`${ghostButtonClass} size-8`}
             >
               <LogOut className="size-5" />
             </button>
             <button
+              ref={newChatButtonRef}
               type="button"
               aria-label="Новый чат"
               onClick={() => setNewChatOpen(true)}
@@ -83,7 +112,7 @@ export function MainScreen({
           <ChatList
             chats={chats}
             activeChatId={activeChatId}
-            onSelect={setActiveChatId}
+            onSelect={showChat}
           />
         </div>
       </aside>
@@ -97,7 +126,7 @@ export function MainScreen({
             credentials={credentials}
             store={store}
             chatId={activeChat.chatId}
-            onBack={() => setActiveChatId(undefined)}
+            onBack={closeChat}
           />
         )}
       </section>
@@ -106,12 +135,17 @@ export function MainScreen({
         <NewChatDialog
           credentials={credentials}
           knownChatId={(phone) => chatIdByPhone[phone]}
-          onClose={() => setNewChatOpen(false)}
+          onClose={() => {
+            setNewChatOpen(false);
+            // Cancelled: back to where the user was. Not done after a lookup
+            // that opened a chat, there the focus belongs to that chat.
+            newChatButtonRef.current?.focus();
+          }}
           onResolved={({ phone, chatId }) => {
             const state = store.getState();
             state.rememberAccount(phone, chatId);
             state.openChat({ chatId, name: formatPhone(phone) });
-            setActiveChatId(chatId);
+            showChat(chatId);
             setNewChatOpen(false);
           }}
         />

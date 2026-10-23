@@ -28,7 +28,26 @@ export type Chat = {
   /** Unix seconds; keeps a chat without messages in the right place. */
   createdAt: number;
   messages: Message[];
+  /** The last message the user has seen; incoming ones after it are unread. */
+  lastReadId?: string;
 };
+
+/** Incoming messages the user has not seen yet. */
+function unreadMessages(chat: Chat): Message[] {
+  const readUpTo = chat.lastReadId
+    ? chat.messages.findIndex((m) => m.id === chat.lastReadId)
+    : -1;
+  // A read marker that is gone (not expected) must not flood the list with
+  // badges: count that as everything read.
+  if (chat.lastReadId && readUpTo === -1) return [];
+  return chat.messages
+    .slice(readUpTo + 1)
+    .filter((m) => m.direction === 'incoming');
+}
+
+export const unreadCount = (chat: Chat) => unreadMessages(chat).length;
+
+export const firstUnreadId = (chat: Chat) => unreadMessages(chat)[0]?.id;
 
 type ChatsState = {
   chats: Record<string, Chat>;
@@ -38,6 +57,8 @@ type ChatsState = {
   /** Creates the chat if it is new; an existing chat is left untouched. */
   openChat: (chat: { chatId: string; name?: string }) => void;
   rememberAccount: (phone: string, chatId: string) => void;
+  /** The user has seen everything in the chat so far. */
+  markRead: (chatId: string) => void;
   /** Adds a pending outgoing message and returns its local id. */
   startSending: (chatId: string, text: string) => string;
   confirmSent: (chatId: string, localId: string, idMessage: string) => void;
@@ -194,12 +215,30 @@ export function createChatsStore(idInstance: string) {
             return {
               chats: {
                 ...state.chats,
-                [chatId]: { ...chat, messages: [...chat.messages, message] },
+                [chatId]: {
+                  ...chat,
+                  messages: [...chat.messages, message],
+                  // Writing back means the user has seen what is above.
+                  lastReadId: message.id,
+                },
               },
             };
           });
           return id;
         },
+
+        markRead: (chatId) =>
+          set((state) => {
+            const chat = state.chats[chatId];
+            const last = chat?.messages.at(-1);
+            if (!chat || !last || chat.lastReadId === last.id) return state;
+            return {
+              chats: {
+                ...state.chats,
+                [chatId]: { ...chat, lastReadId: last.id },
+              },
+            };
+          }),
 
         confirmSent: (chatId, localId, idMessage) =>
           set((state) => {
@@ -222,8 +261,15 @@ export function createChatsStore(idInstance: string) {
                     }
                   : m,
               );
+            // The echo may have been the read marker: it moves to the entry
+            // that took its place.
+            const lastReadId =
+              echo && chat.lastReadId === echo.id ? localId : chat.lastReadId;
             return {
-              chats: { ...state.chats, [chatId]: { ...chat, messages } },
+              chats: {
+                ...state.chats,
+                [chatId]: { ...chat, messages, lastReadId },
+              },
             };
           }),
 

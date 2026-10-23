@@ -1,11 +1,12 @@
 import { useMutation } from '@tanstack/react-query';
 import { ArrowLeft } from 'lucide-react';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useStore } from 'zustand';
 import { createGreenApiClient, type Credentials } from '../../api/client';
 import { ApiError } from '../../api/errors';
+import { ghostButtonClass } from '../../shared/ui/ghost-button';
 import { ChatAvatar } from './chat-avatar';
-import type { ChatsStore } from './chats-store';
+import { firstUnreadId, type ChatsStore } from './chats-store';
 import { Composer } from './composer';
 import { MessageList } from './message-list';
 
@@ -23,6 +24,29 @@ export function ChatWindow({
   onBack,
 }: ChatWindowProps) {
   const chat = useStore(store, (state) => state.chats[chatId]);
+
+  // Remembered once, when the chat is opened: the bar marks what was new then,
+  // and stays there while the chat is open, as in MAX.
+  const [unreadFromId] = useState(() => {
+    const opened = store.getState().chats[chatId];
+    return opened ? firstUnreadId(opened) : undefined;
+  });
+
+  // Whatever is on screen, now or when it arrives, has been seen: but only
+  // while the user is looking. Messages that come in a hidden tab stay unread
+  // until they are back.
+  const messageCount = chat?.messages.length;
+  useEffect(() => {
+    const markReadIfVisible = () => {
+      if (document.visibilityState === 'visible') {
+        store.getState().markRead(chatId);
+      }
+    };
+    markReadIfVisible();
+    document.addEventListener('visibilitychange', markReadIfVisible);
+    return () =>
+      document.removeEventListener('visibilitychange', markReadIfVisible);
+  }, [store, chatId, messageCount]);
   const client = useMemo(
     () => createGreenApiClient(credentials),
     [credentials],
@@ -52,7 +76,7 @@ export function ChatWindow({
           type="button"
           aria-label="Назад к списку"
           onClick={onBack}
-          className="flex size-10 cursor-pointer items-center justify-center rounded-full"
+          className={`${ghostButtonClass} size-10`}
         >
           <ArrowLeft className="size-6" />
         </button>
@@ -66,7 +90,7 @@ export function ChatWindow({
         </h2>
       </header>
 
-      <MessageList messages={chat.messages} />
+      <MessageList messages={chat.messages} unreadFromId={unreadFromId} />
       <Composer onSend={(text) => send.mutate(text)} />
     </>
   );
