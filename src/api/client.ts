@@ -23,6 +23,8 @@ const settingsSchema = z.object({
   outgoingAPIMessageWebhook: yesNo,
 });
 
+export type Settings = z.infer<typeof settingsSchema>;
+
 const receivedSchema = z
   .object({ receiptId: z.number(), body: z.unknown() })
   .nullable();

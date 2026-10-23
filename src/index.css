@@ -2,8 +2,8 @@
 
 @theme {
   --font-sans:
-    Roboto, -apple-system, BlinkMacSystemFont, system-ui, Avenir, Helvetica,
-    Arial, sans-serif;
+    'Roboto Variable', Roboto, -apple-system, BlinkMacSystemFont, system-ui,
+    Avenir, Helvetica, Arial, sans-serif;
 
   /* MAX switches layout at 926px */
   --breakpoint-md: 926px;
@@ -28,6 +28,8 @@
 
   /* accent */
   --color-accent: #007aff;
+  --color-accent-hover: #479fff;
+  --color-accent-pressed: #006ee5;
   --color-accent-disabled: #007aff7a;
 
   /* bubbles */
@@ -45,9 +47,9 @@
 
   /* radii */
   --radius-xs: 6px;
-  --radius-s: 10px;
-  --radius-m: 12px;
-  --radius-l: 16px;
+  --radius-sm: 10px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
   --radius-xl: 20px;
   --radius-card: 28px;
 
