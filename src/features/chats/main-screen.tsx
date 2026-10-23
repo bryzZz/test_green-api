@@ -1,10 +1,10 @@
-import { ArrowLeft, LogOut, Plus } from 'lucide-react';
+import { LogOut, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { useStore } from 'zustand';
 import type { Credentials } from '../../api/client';
 import { formatPhone } from '../../shared/lib/phone';
-import { ChatAvatar } from './chat-avatar';
 import { ChatList } from './chat-list';
+import { ChatWindow } from './chat-window';
 import { createChatsStore, selectSortedChats } from './chats-store';
 import { NewChatDialog } from './new-chat-dialog';
 
@@ -50,7 +50,7 @@ export function MainScreen({ credentials, onLogout }: MainScreenProps) {
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto">
+        <div className="scrollbar-overlay flex-1 overflow-y-auto">
           <ChatList
             chats={chats}
             activeChatId={activeChatId}
@@ -63,24 +63,13 @@ export function MainScreen({ credentials, onLogout }: MainScreenProps) {
         className={`${activeChat ? 'flex' : 'hidden'} bg-wallpaper min-w-0 flex-1 flex-col md:flex`}
       >
         {activeChat && (
-          <header className="bg-bg flex h-16.25 shrink-0 items-center gap-2 px-4">
-            <button
-              type="button"
-              aria-label="Назад к списку"
-              onClick={() => setActiveChatId(undefined)}
-              className="flex size-10 cursor-pointer items-center justify-center rounded-full"
-            >
-              <ArrowLeft className="size-6" />
-            </button>
-            <ChatAvatar
-              chatId={activeChat.chatId}
-              name={activeChat.name}
-              className="size-10 text-base"
-            />
-            <h2 className="truncate text-base leading-5 font-semibold tracking-[0.15px]">
-              {activeChat.name ?? activeChat.chatId}
-            </h2>
-          </header>
+          <ChatWindow
+            key={activeChat.chatId}
+            credentials={credentials}
+            store={store}
+            chatId={activeChat.chatId}
+            onBack={() => setActiveChatId(undefined)}
+          />
         )}
       </section>
 

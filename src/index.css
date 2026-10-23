@@ -68,6 +68,13 @@
     height: 100%;
   }
 
+  /* On phones 100% is taller than the visible area while the browser bars show. */
+  @supports (height: 100dvh) {
+    #root {
+      height: 100dvh;
+    }
+  }
+
   body {
     @apply bg-bg font-sans text-text antialiased;
   }
@@ -75,4 +82,16 @@
 
 @utility bg-wallpaper {
   background-image: linear-gradient(28deg, #99d5d7 8%, #80bcff 91.5%);
+}
+
+/* MAX hides the scrollbar until you scroll or hover, and shows a thin
+   translucent thumb (rgba(12,13,14,.24)); no bounce at the edges. */
+@utility scrollbar-overlay {
+  overscroll-behavior: none;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+
+  &:hover {
+    scrollbar-color: #0c0d0e3d transparent;
+  }
 }
