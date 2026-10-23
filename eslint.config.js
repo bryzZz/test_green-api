@@ -20,5 +20,11 @@ export default defineConfig([
     languageOptions: {
       globals: globals.browser,
     },
+    rules: {
+      // The code style of the project: `const f = () => {}`, early returns.
+      'func-style': ['error', 'expression'],
+      'no-else-return': 'error',
+      curly: ['error', 'multi-line'],
+    },
   },
 ]);

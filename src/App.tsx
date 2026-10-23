@@ -1,21 +1,39 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
-import { authStore, useCredentials } from './features/auth/auth';
-import { LoginScreen } from './features/auth/login-screen';
-import { MainScreen } from './features/chats/main-screen';
+import type { Credentials } from '@/api/createGreenApiClient';
+import { LoginScreen } from '@/features/auth/LoginScreen';
+import { authStore } from '@/features/auth/store/authStore';
+import { useCredentials } from '@/features/auth/store/useCredentials';
+import { MainScreen } from '@/features/chats/MainScreen';
 
-export default function App() {
+const App = () => {
   const [queryClient] = useState(() => new QueryClient());
   const credentials = useCredentials();
   // Why the login screen is shown again, if it was not the user's choice.
   const [notice, setNotice] = useState<string>();
 
-  function logout() {
-    // Forget the token first, so nothing mounted can refetch with it, then
-    // drop whatever the cache still holds.
+  // Forget the token first, so nothing mounted can refetch with it, then drop
+  // whatever the cache still holds.
+  const endSession = () => {
     authStore.getState().logout();
     queryClient.clear();
-  }
+  };
+
+  const handleLoggedIn = (loggedIn: Credentials) => {
+    authStore.getState().login(loggedIn);
+  };
+
+  const handleLogout = () => {
+    setNotice(undefined);
+    endSession();
+  };
+
+  const handleSessionExpired = () => {
+    // A loop that outlived its session must not end the new one.
+    if (authStore.getState().credentials !== credentials) return;
+    setNotice('Учётные данные больше не действуют. Войдите заново.');
+    endSession();
+  };
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -23,23 +41,14 @@ export default function App() {
         <MainScreen
           key={credentials.idInstance}
           credentials={credentials}
-          onLogout={() => {
-            setNotice(undefined);
-            logout();
-          }}
-          onSessionExpired={() => {
-            // A loop that outlived its session must not end the new one.
-            if (authStore.getState().credentials !== credentials) return;
-            setNotice('Учётные данные больше не действуют. Войдите заново.');
-            logout();
-          }}
+          onLogout={handleLogout}
+          onSessionExpired={handleSessionExpired}
         />
       ) : (
-        <LoginScreen
-          notice={notice}
-          onLoggedIn={(loggedIn) => authStore.getState().login(loggedIn)}
-        />
+        <LoginScreen notice={notice} onLoggedIn={handleLoggedIn} />
       )}
     </QueryClientProvider>
   );
-}
+};
+
+export default App;

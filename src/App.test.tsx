@@ -1,10 +1,10 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
+import { authStore } from '@/features/auth/store/authStore';
+import { createFakeGreenApi } from '@/mocks/createFakeGreenApi';
+import { server } from '@/test/server';
 import App from './App';
-import { authStore } from './features/auth/auth';
-import { createFakeGreenApi } from './mocks/fake-green-api';
-import { server } from './test/server';
 
 const credentials = {
   apiUrl: 'https://api.green-api.com',

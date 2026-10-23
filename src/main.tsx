@@ -2,13 +2,13 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import '@fontsource-variable/roboto';
 import './index.css';
-import App from './App.tsx';
+import App from './App';
 
-async function bootstrap() {
+const bootstrap = async () => {
   // Replaced at build time, so the mocks never reach the production bundle.
   if (import.meta.env.MODE === 'mock') {
     try {
-      const { startMockApi } = await import('./mocks/browser');
+      const { startMockApi } = await import('./mocks/startMockApi');
       await startMockApi();
     } catch (error) {
       // e.g. service workers blocked; the app should still render.
@@ -21,6 +21,6 @@ async function bootstrap() {
       <App />
     </StrictMode>,
   );
-}
+};
 
 void bootstrap();

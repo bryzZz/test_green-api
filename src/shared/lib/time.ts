@@ -30,13 +30,18 @@ const MONTHS_GENITIVE = [
 
 const pad = (value: number) => String(value).padStart(2, '0');
 
+/** The current time as unix seconds, the unit of GREEN-API timestamps. */
+export const nowSeconds = () => Math.floor(Date.now() / 1000);
+
 /** The key of the calendar day a timestamp falls on, for grouping messages. */
-export function dayKey(unixSeconds: number): string {
-  return new Date(unixSeconds * 1000).toDateString();
-}
+export const dayKey = (unixSeconds: number): string =>
+  new Date(unixSeconds * 1000).toDateString();
 
 /** `Сегодня`, `Вчера`, `20 октября`, `31 декабря 2025`. */
-export function formatDayLabel(unixSeconds: number, now = new Date()): string {
+export const formatDayLabel = (
+  unixSeconds: number,
+  now = new Date(),
+): string => {
   const date = new Date(unixSeconds * 1000);
   const yesterday = new Date(now);
   yesterday.setDate(now.getDate() - 1);
@@ -45,13 +50,15 @@ export function formatDayLabel(unixSeconds: number, now = new Date()): string {
   if (date.toDateString() === yesterday.toDateString()) return 'Вчера';
 
   const label = `${date.getDate()} ${MONTHS_GENITIVE[date.getMonth()]}`;
-  return date.getFullYear() === now.getFullYear()
-    ? label
-    : `${label} ${date.getFullYear()}`;
-}
+  if (date.getFullYear() === now.getFullYear()) return label;
+  return `${label} ${date.getFullYear()}`;
+};
 
 /** `19:10` for today, `22 окт` for earlier this year, `31.12.2025` before. */
-export function formatChatTime(unixSeconds: number, now = new Date()): string {
+export const formatChatTime = (
+  unixSeconds: number,
+  now = new Date(),
+): string => {
   const date = new Date(unixSeconds * 1000);
 
   if (date.toDateString() === now.toDateString()) {
@@ -61,4 +68,4 @@ export function formatChatTime(unixSeconds: number, now = new Date()): string {
     return `${date.getDate()} ${MONTHS[date.getMonth()]}`;
   }
   return `${pad(date.getDate())}.${pad(date.getMonth() + 1)}.${date.getFullYear()}`;
-}
+};

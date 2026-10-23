@@ -7,7 +7,7 @@ import { defineConfig } from 'vitest/config';
 
 // Serves the MSW worker script straight from node_modules in mock mode, so it
 // never has to live in `public/` and end up in the production build.
-function mockServiceWorker(): Plugin {
+const mockServiceWorker = (): Plugin => {
   const workerPath = fileURLToPath(
     new URL('./node_modules/msw/lib/mockServiceWorker.js', import.meta.url),
   );
@@ -15,18 +15,21 @@ function mockServiceWorker(): Plugin {
   return {
     name: 'mock-service-worker',
     apply: (_config, { mode }) => mode === 'mock',
-    configureServer(server) {
+    configureServer: (server) => {
       server.middlewares.use('/mockServiceWorker.js', (_req, res) => {
         res.setHeader('Content-Type', 'text/javascript');
         res.end(readFileSync(workerPath));
       });
     },
   };
-}
+};
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss(), mockServiceWorker()],
+  resolve: {
+    alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
+  },
   test: {
     environment: 'jsdom',
     globals: true,
