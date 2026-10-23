@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
 import { authStore, useCredentials } from './features/auth/auth';
 import { LoginScreen } from './features/auth/login-screen';
+import { MainScreen } from './features/chats/main-screen';
 
 export default function App() {
   const [queryClient] = useState(() => new QueryClient());
@@ -17,16 +18,11 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       {credentials ? (
-        <main className="bg-wallpaper flex h-full flex-col items-center justify-center gap-4">
-          <h1 className="text-2xl font-semibold">MAX Chat</h1>
-          <button
-            type="button"
-            onClick={logout}
-            className="rounded-md bg-bg px-4 py-2"
-          >
-            Выйти
-          </button>
-        </main>
+        <MainScreen
+          key={credentials.idInstance}
+          credentials={credentials}
+          onLogout={logout}
+        />
       ) : (
         <LoginScreen
           onLoggedIn={(loggedIn) => authStore.getState().login(loggedIn)}

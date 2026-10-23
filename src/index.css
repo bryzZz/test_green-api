@@ -23,8 +23,11 @@
   --color-bg: #fff;
   --color-bg-secondary: #f5f7fa;
   --color-bg-selected: #007aff14;
+  --color-row-hover: #f6f6f6;
+  --color-row-pressed: #fafafa;
   --color-input: #09090914;
   --color-divider: #0c0d0e29;
+  --color-overlay: #0c0d0e52;
 
   /* accent */
   --color-accent: #007aff;

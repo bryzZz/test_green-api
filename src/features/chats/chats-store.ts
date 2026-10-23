@@ -149,21 +149,27 @@ export function createChatsStore(idInstance: string) {
         chatIdByPhone: {},
 
         openChat: ({ chatId, name }) =>
-          set((state) =>
-            state.chats[chatId]
-              ? state
-              : {
-                  chats: {
-                    ...state.chats,
-                    [chatId]: {
-                      chatId,
-                      name,
-                      createdAt: nowSeconds(),
-                      messages: [],
-                    },
+          set((state) => {
+            const existing = state.chats[chatId];
+            if (!existing) {
+              return {
+                chats: {
+                  ...state.chats,
+                  [chatId]: {
+                    chatId,
+                    name,
+                    createdAt: nowSeconds(),
+                    messages: [],
                   },
                 },
-          ),
+              };
+            }
+            // A chat born from a message may not have a name yet.
+            if (existing.name || !name) return state;
+            return {
+              chats: { ...state.chats, [chatId]: { ...existing, name } },
+            };
+          }),
 
         rememberAccount: (phone, chatId) =>
           set((state) => ({
