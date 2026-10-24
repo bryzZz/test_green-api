@@ -56,7 +56,7 @@ export const Composer = ({ onSend }: ComposerProps) => {
   };
 
   return (
-    <div className="shrink-0 px-3 pb-3 md:px-6 md:pb-4">
+    <div className="shrink-0 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:px-6 md:pb-4">
       <div className="bg-bg shadow-composer mx-auto flex max-w-177 items-end gap-2 rounded-lg px-3 py-1.5">
         <textarea
           ref={fieldRef}
